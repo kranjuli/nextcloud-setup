@@ -48,10 +48,14 @@ sudo chmod -R 755 nextcloud/
 
 5. Apache konfigurieren
 
+Öffne die Apache-Konfigurationsdatei für Nextcloud:
+
 ````
 sudo nano /etc/apache2/sites-available/nextcloud.conf
 ````
+Füge sicherheitshalber den folgenden Inhalt ein (falls du das noch nicht getan hast):
 
+````
 <VirtualHost *:80>
   # ServerAdmin admin@deinedomain.com
   DocumentRoot /var/www/nextcloud
@@ -64,9 +68,9 @@ sudo nano /etc/apache2/sites-available/nextcloud.conf
   </Directory>
 
 </VirtualHost>
-
 ````
 
+````
 sudo a2ensite nextcloud.conf
 sudo systemctl reload apache2
 
