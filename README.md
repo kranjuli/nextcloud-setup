@@ -170,3 +170,16 @@ sudo systemctl start apache2
 # only at first mounting
 sudo -u www-data php /var/www/nextcloud/occ maintenance:repair
 ```
+## Use local hostname for Raspberry Pi
+
+Install `avahi` to use local hostname e.g. <your_nextcloud_hostname> instead of ip of the raspberry pi
+
+```bash
+sudo apt install avahi -y
+
+systemctl status avahi-daemon
+
+# set hostname for raspberry pi
+
+sudo hostnamectl set-hostname <your_nextcloud_hostname>
+```
