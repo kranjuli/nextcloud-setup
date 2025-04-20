@@ -24,7 +24,7 @@ Install NextCloud auf Raspberry Pi
 3. Setup MariaDB (MySQL)
 
    ```
-   sudo msql
+   sudo mysql
 
    CREATE DATABASE nextcloud;
    CREATE USER 'your_nextcloud_user'@'localhost' IDENTIFIED BY 'your_password';
@@ -32,8 +32,7 @@ Install NextCloud auf Raspberry Pi
    FLUSH PRIVILEGES;
    EXIT;
 
-   sudo systemctl start mariadb
-   sudo systemctl enable mariadb
+   sudo systemctl status mariadb
    ```
 
 4. Download and install Nextcloud
@@ -95,18 +94,18 @@ Install NextCloud auf Raspberry Pi
    sudo apt install redis-server php-redis -y
 
    # check status of redis
-   systemctl status redis-server
+   sudo systemctl status redis-server
 
    # enable and start of redis-server still not enable
-   systemctl enable redis-server
-   systemctl start redis-server
+   sudo systemctl enable redis-server
+   sudo systemctl start redis-server
 
    # test redis
    redis-cli ping
    # answer must be PONG
 
    # config in nextcloud
-   nano /var/www/nextcloud/config/config.php
+   sudo nano /var/www/nextcloud/config/config.php
 
    # insert following config into config.php
    #'memcache.locking' => '\\OC\\Memcache\\Redis',
@@ -117,13 +116,13 @@ Install NextCloud auf Raspberry Pi
    #     'timeout' => 0.0,
    #  ],
 
-   usermod -aG redis www-data
+   sudo usermod -aG redis www-data
    ```
 
 8. Configure OPCache
 
    ```bash
-   nano /etc/php/8.2/apache2/php.ini
+   sudo nano /etc/php/8.2/apache2/php.ini
 
    #[opcache]
    #opcache.enable=1
@@ -140,36 +139,71 @@ Install NextCloud auf Raspberry Pi
 
 Install Nextcloud App on iPhone and configure
 
-## Mounting with external SSD 
+## Move nextcloud to external SSD
 
 > [!NOTE]
 > Linux supports only SSD with ext4 format.
 > Command to format the SSD with ext4:: sudo mkfs.ext4 /dev/sda1
 
+### Nextcloud application
+
 ```bash
+# show connected devices
 lsbk
+
+# create mount point
 sudo mkdir /mnt/ssd
 sudo mount /dev/sda1 /mnt/ssd
 
-# mounting persistence
+# persistence mounting
 sudo nano /etc/fstab
 # insert line below into /etc/fstab
-/dev/sda1 /mnt/ssd ext4 defaults 0 0
+# /dev/sda1 /mnt/ssd ext4 defaults 0 0
 
+# stop apache2
 sudo systemctl stop apache2
 
-sudo mv /var/www/nextcloud/data /mnt/ssd/nextcloud_data
+# mv /var/www/nextcloud to /mnt/ssd
+sudo mv /var/www/nextcloud /mnt/ssd/
 
-sudo chown -R www-data:www-data /mnt/ssd/nextcloud_data
+sudo chown -R www-data:www-data /mnt/ssd/nextcloud
 
-sudo nano /var/www/nextcloud/config/config.php
+# adjust config
+sudo nano /mnt/ssd/nextcloud/config/config.php
 # insert line below into config.php
 'datadirectory' => '/mnt/ssd/nextcloud_data'
+
+cd /var/www
+sudo /mnt/ssd/nextcloud nextcloud 
 
 sudo systemctl start apache2
 # only at first mounting
 sudo -u www-data php /var/www/nextcloud/occ maintenance:repair
 ```
+
+### nextcloud's database
+
+```bash
+sudo systemctl stop mysql
+# or sudo systemctl stop mariadb
+
+mkdir /mnt/ssd/mysql
+sudo chown -R mysql:mysql /mnt/ssd/mysql
+
+# copy database
+sudo rsync -av /var/lib/mysql/ /media/ssd/mysql/
+
+sudo chown -R mysql:mysql /mnt/ssd/mysql
+
+rm -rf /var/lib/mysql
+
+cd /var/lib
+ln -s /mnt/ssd/mysql mysql
+
+sudo systemctl start mysql
+sudo systemctl status mysql
+```
+
 ## Use local hostname for Raspberry Pi
 
 Install `avahi` to use local hostname e.g. <your_nextcloud_hostname> instead of ip of the raspberry pi
@@ -183,3 +217,43 @@ systemctl status avahi-daemon
 
 sudo hostnamectl set-hostname <your_nextcloud_hostname>
 ```
+
+## Backup nextcloud from SSD after flashing of SD card
+* Create Mounting
+  ```bash
+  # create mount point to ssd
+  lsblk
+  sudo mkdir /mnt/ssd
+  # ssd = sda1
+  mount /dev/sda1 /mnt/ssd
+  ```
+* Mysql:
+  ```bash
+  sudo systemctl stop mysql
+  # or sudo systemctl stop mariadb
+
+  sudo mv /var/lib/mysql /var/lib/mysql.bak
+
+  # create symlink for mysql
+  cd /var/lib
+  sudo ln -s /mnt/ssd/mysql mysql
+
+  sudo chown -R mysql:mysql /var/lib/mysql
+
+  sudo systemctl start mysql
+  sudo systemctl status mysql
+  ```
+
+* Nextcloud app:
+  ```bash
+  # create symlink for nextcloud app
+  sudo systemctl stop apache2
+  cd /var/www
+  sudo ln -s /mnt/ssd/nextcloud nextcloud
+  sudo chown -R www-data:www-data nextcloud
+
+  sudo systemctl stop apache2
+
+  # run occ scan 
+  sudo -u www-data php /var/www/html/nextcloud/occ files:scan --all
+  ```
